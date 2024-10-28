@@ -7,7 +7,7 @@ module mantissa_normalizer(
     output [7:0] exponent_shift
 );
 
-assign out[22:0] = in_carry ? in[22:0] >> 1 :
+assign out[22:0] = in_carry ? in[23:0] >> 1 :
     in[23] ? in[22:0] :
     in[22] ? in[22:0] << 1 :
     in[21] ? in[22:0] << 2 :
