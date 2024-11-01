@@ -24,12 +24,12 @@ exponent_adder adder_b(
 );
 
 exponent_inverter b_inverter(
-    .in(in_b),
+    .in(sign_shifted_b),
     .out(inverted_b)
 );
 
 exponent_adder final_adder(
-    .in_a(in_a),
+    .in_a(sign_shifted_a),
     .in_b(inverted_b),
     .out(comparison_result)
 );

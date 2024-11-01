@@ -31,7 +31,7 @@ assign out[22:0] = in_carry ? in[23:0] >> 1 :
     in[1] ? in[22:0] << 20 :
     in[0] ? in[22:0] << 21 :
     0;
-
+    
 assign exponent_shift = in_carry ? -1 :
     in[23] ? 0 :
     in[22] ? 1 :
