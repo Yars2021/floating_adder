@@ -7,29 +7,16 @@ module exponent_aligner(
     output [7:0] out_dist
 );
 
-wire [7:0] sign_shifted_a, sign_shifted_b;
 wire [7:0] inverted_b;
 wire [7:0] comparison_result, inverted_comparison_result;
 
-exponent_adder adder_a(
-    .in_a(in_a),
-    .in_b(8'b10000001), // -127 bias
-    .out(sign_shifted_a)
-);
-
-exponent_adder adder_b(
-    .in_a(in_b),
-    .in_b(8'b10000001), // -127 bias
-    .out(sign_shifted_b)
-);
-
 exponent_inverter b_inverter(
-    .in(sign_shifted_b),
+    .in(in_b),
     .out(inverted_b)
 );
 
 exponent_adder final_adder(
-    .in_a(sign_shifted_a),
+    .in_a(in_a),
     .in_b(inverted_b),
     .out(comparison_result)
 );
