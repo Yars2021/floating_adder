@@ -14,23 +14,34 @@ module pipelined_float_adder(
 );
 
 
-// Reset
-always_ff @(posedge clk_i) begin
-    if (rst_i) begin
-        stage_status <= 5'b11111;
-        data_status <= 5'b00000;
-    end
-end
-
-
 // Stage 0 (Taking input)
 logic stage_0_sign_a, stage_0_sign_b;
 logic [7:0] stage_0_exponent_a, stage_0_exponent_b;
 logic [24:0] stage_0_mantissa_a, stage_0_mantissa_b;
 
+// Stage 1 (Aligning)
+logic stage_1_sign_a, stage_1_sign_b;
+logic [7:0] stage_1_exponent_result;
+logic [24:0] stage_1_mantissa_a, stage_1_mantissa_b;
+
+// Stage 2 (Adding)
+logic stage_2_sign_result;
+logic [7:0] stage_2_exponent_result;
+logic [24:0] stage_2_mantissa_sum;
+
+// Stage 3 (Normalizing)
+logic stage_3_sign_result;
+logic [7:0] stage_3_exponent_result;
+logic [24:0] stage_3_mantissa_result;
+
+
 always_ff @(posedge clk_i) begin
-    if (~rst_i) begin
-        if (stage_status[0] && inp_rdy) begin
+    if (rst_i) begin
+        stage_status <= 5'b11111;
+        data_status <= 5'b00000;
+    end else begin
+        // Stage 0 (Reading input)
+        if (stage_status[0] == 1 && inp_rdy) begin
             stage_status[0] <= 0;
             data_status[0] <= 0;
         
@@ -45,17 +56,8 @@ always_ff @(posedge clk_i) begin
             
             data_status[0] <= 1;
         end
-    end
-end
-
-
-// Stage 1 (Aligning)
-logic stage_1_sign_a, stage_1_sign_b;
-logic [7:0] stage_1_exponent_result;
-logic [24:0] stage_1_mantissa_a, stage_1_mantissa_b;
-
-always_ff @(posedge clk_i) begin
-    if (~rst_i) begin
+        
+        // Stage 1 (Aligning)
         if (stage_status[1] && data_status[0]) begin
             stage_status[1] <= 0;
             data_status[1] <= 0;
@@ -77,17 +79,8 @@ always_ff @(posedge clk_i) begin
             data_status[0] <= 0;
             stage_status[0] <= 1;
         end
-    end
-end
-
-
-// Stage 2 (Adding)
-logic stage_2_sign_result;
-logic [7:0] stage_2_exponent_result;
-logic [24:0] stage_2_mantissa_sum;
-
-always_ff @(posedge clk_i) begin
-    if (~rst_i) begin
+        
+        // Stage 2 (Adding)
         if (stage_status[2] && data_status[1]) begin
             stage_status[2] <= 0;
             data_status[2] <= 0;
@@ -106,62 +99,38 @@ always_ff @(posedge clk_i) begin
                     stage_2_sign_result <= stage_1_sign_b;
                 end
             end
-            
+
             data_status[2] <= 1;
             data_status[1] <= 0;
             stage_status[1] <= 1;
         end
-    end
-end
-
-
-// Stage 3 (Normalizing)
-logic normalized;
-logic [4:0] normalization_current;
-
-logic stage_3_sign_result;
-logic [7:0] stage_3_exponent_result;
-logic [24:0] stage_3_mantissa_result;
-
-always_ff @(posedge clk_i) begin
-    if (~rst_i) begin
+        
+        // Stage 3 (Normalizing)
         if (stage_status[3] && data_status[2]) begin
             stage_status[3] <= 0;
             data_status[3] <= 0;
             
-            normalized <= 1'b0;
-            normalization_current <= 5'd22;
-            
             stage_3_sign_result <= stage_2_sign_result;
-        end else if (normalized) begin
+            
+            if (stage_2_mantissa_sum[24] == 1) begin
+                stage_3_mantissa_result <= stage_2_mantissa_sum >> 1;
+                stage_3_exponent_result = stage_2_exponent_result + 1;
+            end else if (stage_2_mantissa_sum[23] == 0) begin
+                for (int i = 22; i >= 0; i = i - 1) begin
+                    if (stage_2_mantissa_sum[i] == 1) begin
+                        stage_3_mantissa_result <= stage_2_mantissa_sum << (23 - i);
+                        stage_3_exponent_result <= stage_2_exponent_result - (23 - i);
+                        break;
+                    end
+                end
+            end
+
             data_status[3] <= 1;
             data_status[2] <= 0;
             stage_status[2] <= 1;
-        end else begin
-            if (stage_2_mantissa_sum[24] == 1) begin
-                stage_3_mantissa_result <= stage_2_mantissa_sum >> 1;
-                stage_3_exponent_result <= stage_2_exponent_result + 1;
-                normalized <= 1'b1;
-            end else if (stage_2_mantissa_sum[23] == 1) begin
-                stage_3_mantissa_result <= stage_2_mantissa_sum;
-                normalized <= 1'b1;
-            end else if (stage_2_mantissa_sum[normalization_current] == 1) begin
-                stage_3_mantissa_result <= stage_2_mantissa_sum << (23 - normalization_current);
-                stage_3_exponent_result <= stage_2_exponent_result - (23 - normalization_current);
-                normalized <= 1'b1;
-            end else if (normalization_current == 0) begin
-                normalized <= 1'b1;
-            end else begin
-                normalization_current <= normalization_current - 1;
-            end
         end
-    end
-end
-
-
-// Stage 4 (Giving output)
-always_ff @(posedge clk_i) begin
-    if (~rst_i) begin
+        
+        // Stage 4 (Giving output)
         if (stage_status[4] && data_status[3]) begin
             stage_status[4] <= 0;
             data_status[4] <= 0;
